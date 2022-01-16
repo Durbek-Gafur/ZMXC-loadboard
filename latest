@@ -1,0 +1,1447 @@
+
+
+
+
+
+var days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+var gpstabTrucks = [707] //[150,686,707,123,6677,6669,6655,996,136,686,312,777,274339,1977,6673,4048,6680,7701,895645]
+var usersPermitted = ['dispatch@martianexpress.us',]
+//automate this
+  var columnsLetters = { 
+    "brokerrangenUMBER":12,
+    "COVEREDnUMBER":7,
+    "DISPATCHnUMBER":1,
+    "DRIVERnUMBER":6,
+    "DISPATCH":'A',
+    "LOAD#":'B',
+    "TRUCK":'C',  
+    "TRAILER":'D', 
+    "DRIVER":'E', 
+    "PHONE":'F',
+    "COVERED":'G',
+    
+    "PU":'H',
+    "DEL":'I',
+    "MILES":'J',
+    "RATE":'K',
+    "BROKER":'L',
+
+    "LAST_COLUMN": 13,
+    "LAST_COLUMNLetter": "M"
+  }
+
+
+/**
+ * Loads main web app page.
+ * Learm more about web apps:
+ * https://developers.google.com/apps-script/guides/web
+ *
+ * @param {Object} e - HTTP GET event.
+ */
+function doGet(e) {
+  deleteTriggers()
+  Logger.log(e.parameter);
+  
+  if(!triggerExists("check1hourBeforePickUp"))check1hourBeforePickUpTriggers();
+  if(!triggerExists("getLocations"))createTimeDrivenTriggers();
+  if(!triggerExists("myOnEdit"))createOnEditTriggers("myOnEdit");
+  if(!triggerExists("newDay"))newdayTrigger();
+  if(!triggerExists("monChange")) createOnchange();
+  // if(!triggerExists("myonOpen"))createOnOpenTriggers("myonOpen"); newdayTrigger()
+  return HtmlService.createHtmlOutputFromFile('Page');
+  
+}
+
+
+function deleteTriggers(){
+  var triggers = ScriptApp.getProjectTriggers();
+
+  triggers.forEach(function(trigger){
+
+    try{
+      ScriptApp.deleteTrigger(trigger);
+    } catch(e) {
+      throw e.message;
+    };
+
+    Utilities.sleep(1000);
+
+  });
+
+};
+
+
+/**
+ * Writes phone number into spreadsheet .
+ *
+ * @param {number} phoneNumber - number submitted from web app.
+ */
+function userClicked(phoneNumber="AAA"){
+    // write(phoneNumber);
+}
+
+function write(text){
+  Logger.log(text)
+  return;
+    var spreadsheet = SpreadsheetApp.openByUrl(SHEET_LOG);
+  var sheet = spreadsheet.getSheets()[1];
+  
+  sheet.appendRow([new Date(), text]);
+}
+
+function writebrut(text){
+      var spreadsheet = SpreadsheetApp.openByUrl(SHEET_LOG);
+  var sheet = spreadsheet.getSheets()[1];
+  
+  sheet.appendRow([new Date(), text]);
+}
+function createTimeDrivenTriggers(){
+      try{
+      ScriptApp.newTrigger('getLocations')
+          .timeBased()
+          .everyMinutes(5)
+          .create();
+      }catch(e){
+        text("error "+e)
+      }
+}
+
+
+function check1hourBeforePickUpTriggers(){
+      try{
+      ScriptApp.newTrigger('check1hourBeforePickUp')
+          .timeBased()
+          .everyMinutes(15)
+          .create();
+      }catch(e){
+        text("error "+e)
+      }
+}
+
+function monChange(e){
+  if(e.changeType=="INSERT_ROW" || e.changeType=="REMOVE_ROW")
+  {
+    init_bounds();
+  }
+}
+
+function createOnchange(){
+      try{
+      ScriptApp.newTrigger("monChange")
+        .forSpreadsheet(SHEET_ID)
+        .onChange()
+        .create();
+      }catch(e){
+        write("error "+e)
+      }
+}
+function init_bounds(){
+  var spreadSheet = SpreadsheetApp.openByUrl(SHEET_URL).getSheetByName("Loadboard");
+  var mergedlist=[] ;
+  var lastrow = spreadSheet.getLastRow();
+  var rangeValues = spreadSheet.getRange(columnsLetters["DRIVER"]+3+":"+columnsLetters["DRIVER"]+lastrow).getValues();
+  for(i=0;i<=lastrow-3;i++){
+    if(rangeValues[i][0]=="" || rangeValues[i][0]=="DRIVER"){
+      mergedlist.push(i+3)
+      
+    }
+  }
+    var sheet10B2 = SpreadsheetApp.openByUrl(SHEET_URL).getSheetByName("Sheet10").getRange("B2");
+  alert(JSON.stringify(mergedlist));
+  sheet10B2.setValue(JSON.stringify(mergedlist));
+}
+
+function newdayTrigger(){
+  ScriptApp.newTrigger("newDay")
+  .timeBased()
+  .atHour(6)
+  .nearMinute(40)
+  .everyDays(1) // Frequency is required if you are using atHour() or nearMinute()
+  .inTimezone("America/New_York")
+  .create();
+}
+
+function createOnEditTriggers(funcName){
+      try{
+        ScriptApp.newTrigger(funcName)
+            .forSpreadsheet(SHEET_ID)
+            .onEdit()
+            .create();
+      }catch(e){
+        text("error "+e)
+      }
+}
+
+function createOnOpenTriggers(funcName){
+      try{
+        ScriptApp.newTrigger(funcName)
+            .forSpreadsheet(SHEET_ID)
+            .onOpen()
+            .create();
+      }catch(e){
+        text("error "+e)
+      }
+}
+
+function triggerExists(triggerName) {
+
+  var triggers = ScriptApp.getProjectTriggers();
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() == triggerName) {
+
+      write(triggerName+" trigger exists :");
+      return true
+    }
+    
+  }
+  write(triggerName+" trigger doesn't exist");
+  return false
+}
+
+
+
+
+
+function onInstall(e) {
+  onOpen(e);
+}
+
+
+function myonOpen(e) {
+  // var scriptID = ScriptApp.getScriptId(); alert(scriptID)
+  var spreadsheet = SpreadsheetApp.openByUrl(SHEET_URL);
+  var menuItems = [ 
+    {name: 'Gross', functionName: 'Gross'},{name: 'New Day', functionName: 'newDay'}, { name: 'Locations', functionName: 'getLocations'},{name: 'New Week', functionName: 'newWeek'} //{ name: 'Night Board', functionName: 'nightShiftBoard'},,{name: 'Test 2', functionName: 'testMerge'}
+  ];
+  spreadsheet.addMenu('ZMXC', menuItems);
+}
+
+function msToHours(ms){
+  return (ms/3600000).toFixed()
+}
+
+function msToHoursMinutes(ms) {
+    return new Date(ms).toISOString().slice(11, -8);
+}
+
+function gethos(clocks){
+  cyc = ""
+  cm = ""
+  try{
+      cyc = msToHours(clocks.cycle.cycleRemainingDurationMs) +" ("+msToHours(clocks.cycle.cycleTomorrowDurationMs)+")"
+      cm =  "B: "+msToHoursMinutes(clocks.break.timeUntilBreakDurationMs)+" D: "+msToHoursMinutes(clocks.drive.driveRemainingDurationMs)+" SH: "+msToHoursMinutes(clocks.shift.shiftRemainingDurationMs)
+  }
+  catch(e){
+      alert(e);
+    }
+  var hos ={ 
+    "cycle": cyc,
+    "comment": cm
+  }
+  return hos
+}
+ 
+function getLocations(notes=false,secondSamsara = false){
+  var spreadSheet = SpreadsheetApp.openByUrl(SHEET_URL).getSheetByName("Loadboard");
+  var lastRow = spreadSheet.getLastRow();
+  var token = "Bearer samsara_api_OiBTKH2QyjJ3cseKkOWSTJaTy4SScc"
+ 
+  
+
+  var response = UrlFetchApp.fetch("https://api.samsara.com/fleet/vehicles/locations", {
+  "headers": {
+    "Authorization": token
+  }
+  });
+  // Logger.log(response)
+  // writebrut(response)
+  response = JSON.parse(response);
+  var lngth = response.data.length;
+  
+  var response2 =UrlFetchApp.fetch("https://api.samsara.com/fleet/hos/clocks", {
+    "headers": {
+      "Authorization": token
+    }
+  });
+  // writebrut(response2)
+  // return;
+  var gpstabresponse = gpstab();
+  response2 = JSON.parse(response2);
+  var lngth2 = response2.data.length;
+  // Logger.log(response2)
+
+  var bgrry = {},bgrry2 = {}
+  for(var i=0;i<lngth;i++){
+      // alert(i)
+      var dt = response.data[i];
+      // Logger.log(JSON.stringify(dt.name) +"-"+ JSON.stringify(dt.location.reverseGeo.formattedLocation) +"-"+  JSON.stringify(dt.location.speed) +"-"+ (dt.location.latitude+","+dt.location.longitude))
+      bgrry[dt.name] = [dt.location.reverseGeo.formattedLocation, dt.location.speed,(dt.location.latitude+","+dt.location.longitude)];
+  }
+  
+  for(var i=0;i<lngth2;i++){
+    
+      var dt = response2.data[i];
+      // Logger.log(dt.driver.name)
+      bgrry2[dt.driver.name.toUpperCase().trim()]= gethos(dt.clocks) //(dtcycle.cycleRemainingDurationMs/3600000).toFixed()+" ("+(dtcycle.cycleTomorrowDurationMs/3600000).toFixed()+") " ;
+  }
+  ///EXCEPTION REMOVE LATER WHEN FAZLIDDIN BATIROV'S ELD IS IN GPSTAB
+  bgrry2["FAZLIDDIN BATIROV"]={ 
+    "cycle": "XX",
+    "comment": "GPS TAB FOR REFERENCE"
+  }
+  // alert(JSON.stringify(bgrry2))
+  // alert(JSON.stringify(bgrry))
+  // Logger.log(bgrry2)
+  for(var i = lastRow-1; !isDate(spreadSheet.getRange("A"+i).getValue());i--){
+    try{
+      var rnge = spreadSheet.getRange(columnsLetters["TRUCK"]+i)
+      var rngeVal = rnge.getValue();
+
+      if(rnge.isPartOfMerge()){
+        continue;
+      }
+      rngeVal = isNaN(rngeVal)? false: rngeVal
+      var driverArray = spreadSheet.getRange(columnsLetters["DRIVER"]+i).getValue().replace('no expedited loads','').toUpperCase().replace('SOLO','').replace('TEAM','').replace(/ *\([^)]*\) */g, "").trim().split(" / ");
+
+      rngeValBool = rngeVal
+      // if(!secondSamsara) rngeVal+=" Martian Express CO"
+
+
+     
+      var cellOfCurrentLocation = spreadSheet.getRange(columnsLetters["PU"]+i);
+      var cellOfDeliveryLocation = spreadSheet.getRange(columnsLetters["DEL"]+i)
+      var valueOfDeliveryLocation = cellOfDeliveryLocation.getValue();
+      var valueofStatus = spreadSheet.getRange(columnsLetters["COVERED"]+i).getValue().toUpperCase();
+      var loadNumber = spreadSheet.getRange(columnsLetters["LOAD#"]+i).getValue();
+      var valueofTruck = spreadSheet.getRange(columnsLetters["TRUCK"]+i).getValue();
+
+      var rangeofRate = spreadSheet.getRange(columnsLetters["RATE"]+i);
+      var rangeofBroker = spreadSheet.getRange(columnsLetters["BROKER"]+i);
+      var valueofRate = rangeofRate.getValue().toUpperCase();
+      var valueofBroker = rangeofBroker.getValue().toUpperCase();
+
+
+      var tmpchecktmr = checktimer(valueofRate,valueofTruck)
+      if(tmpchecktmr){ rangeofRate.setValue(tmpchecktmr)     }
+      
+      var tmpchecktmr = checktimer(valueofBroker,valueofTruck);
+      if(tmpchecktmr){ rangeofBroker.setValue(tmpchecktmr)}
+// continue
+      var etaCell = valueofStatus.includes('ETA')  || valueofStatus.includes('TOUR') 
+      var puCell = valueofStatus.includes('PU') || valueofStatus.includes('DHING')
+      ///////////////////////////////
+      ///////////////////////////////     
+      // if(valueofStatus.includes('PU') && !valueofStatus.includes('PU_CHECKED_IN')) 
+      //   {
+      //     xxnotify1hourBeforePickUp(valueofStatus,rngeVal,loadNumber);          
+      //   }
+      // continue
+      ///////////////////////////////
+      ///////////////////////////////
+      
+      loadNumber = "Load  "+loadNumber +"\n";
+      if(rngeValBool && rngeVal in bgrry &&  !spreadSheet.getRange(columnsLetters["COVERED"]+i).getValue().toUpperCase().includes('COVERED')){
+        var loc = bgrry[rngeVal][0]
+        var loc = loc.split(",");
+        var loclen = loc.length;
+
+      if(loclen>2){
+        var prettyLocationName = loc[loclen-2] +", "+loc[loclen-1]
+      }else{
+        var prettyLocationName = bgrry[rngeVal][0]
+      }
+        hrsofsrv+=  "";
+        comment+=  "";
+          try{
+              var hrsofsrv = bgrry2[driverArray[0]]["cycle"]
+              var comment = bgrry2[driverArray[0]]["comment"]
+              hrsofsrv+= (1 in driverArray)? " / "+bgrry2[driverArray[1]]["cycle"] : "";
+              comment+= (1 in driverArray)? "\n"+bgrry2[driverArray[1]]["comment"] : "";
+          } catch(e){
+            alert(e)
+          }
+              
+        if(!hrsofsrv.includes("undefined")){
+                     
+          var milePerHour =   parseInt(bgrry[rngeVal][1])      
+          var movementState = (milePerHour>0)? "\nRolling" : "\nStationary"
+
+          spreadSheet.getRange(columnsLetters["MILES"]+i).setValue(milePerHour+" mi/h "+hrsofsrv).setComment(comment) //loc[loclen-2] +", "+loc[loclen-1]
+          var urlForGoogle = 'https://www.google.com/maps/dir/'+bgrry[rngeVal][2]+'/'+valueOfDeliveryLocation+'/@'+bgrry[rngeVal][2];
+          // var urlForGoogle = 'https://www.google.com/maps/dir/'+bgrry[rngeVal][2]+'/&'+valueOfDeliveryLocation+'&/@'+bgrry[rngeVal][2];
+          if(etaCell || puCell){
+            var arrayETAandCity = getMiles(urlForGoogle)
+            var patterCurrentLoc = '=hyperlink("'+urlForGoogle +'","'+prettyLocationName+' | '+arrayETAandCity[0]+'")';
+
+            var updatetext = loadNumber+(arrayETAandCity[1]).replace("undefined,", "")+movementState
+            if (etaCell) cellOfDeliveryLocation.setComment(updatetext)
+          }else{
+            var patterCurrentLoc = '=hyperlink("'+urlForGoogle +'","'+prettyLocationName+'")';
+            cellOfDeliveryLocation.setComment("")
+          }
+          patterCurrentLoc = patterCurrentLoc.replace("undefined,", "");
+          cellOfCurrentLocation.setValue(patterCurrentLoc)
+         
+        }
+        
+      }
+      if(rngeVal && parseInt(rngeVal) in gpstabresponse && !spreadSheet.getRange(columnsLetters["COVERED"]+i).getValue().toUpperCase().includes('COVERED')){
+              var milePerHour =   gpstabresponse[rngeVal]["speed"]    
+              var movementState = (milePerHour>0)? "\nRolling" : "\nStationary"
+                spreadSheet.getRange(columnsLetters["MILES"]+i).setValue(milePerHour+" mi/h "+gpstabresponse[rngeVal]["hours"]).setComment(gpstabresponse[rngeVal]["comment"])
+
+                var urlForGoogle = 'https://www.google.com/maps/dir/'+gpstabresponse[rngeVal]["coordinates"]+'/&'+valueOfDeliveryLocation+'&/@'+gpstabresponse[rngeVal]["coordinates"];
+                  if(etaCell || puCell){
+                    var arrayETAandCity = getMiles(urlForGoogle)
+                    var patterCurrentLoc = '=hyperlink("'+urlForGoogle +'","'+gpstabresponse[rngeVal]["location"]+' | '+arrayETAandCity[0]+'")';
+                    if(etaCell) cellOfDeliveryLocation.setComment(loadNumber+(arrayETAandCity[1]).replace("undefined,", "")+movementState)
+                  }else{
+                    var patterCurrentLoc = '=hyperlink("'+urlForGoogle +'","'+gpstabresponse[rngeVal]["location"]+'")';
+                    cellOfDeliveryLocation.setComment("")
+                  }
+                
+                patterCurrentLoc = patterCurrentLoc.replace("undefined,", "");
+                cellOfCurrentLocation.setValue(patterCurrentLoc)
+
+
+                spreadSheet.getRange(columnsLetters["PU"]+i).setValue(patterCurrentLoc) //gpstabresponse[rngeVal]["location"])  
+      }
+      if(notes){
+        spreadSheet.getRange(columnsLetters["RATE"]+i+":"+columnsLetters["BROKER"]+i).setValues(notes[spreadSheet.getRange(columnsLetters["TRUCK"]+i).getValue()])
+      }
+
+    }catch(e){
+      // spreadSheet.getRange(columnsLetters["PU"]+i).setValue("")
+      // spreadSheet.getRange(columnsLetters["DEL"]+i).setComment("")
+      // spreadSheet.getRange(columnsLetters["MILES"]+i).setValue("").setComment("")
+      alert(e);
+    }
+
+  }
+
+                  var today = new Date();
+        var h = today.getHours();
+        var m = today.getMinutes();
+        var s = today.getSeconds();
+        spreadSheet.getRange("A1").setValue("Last upd "+h+":"+m+":"+s)
+// spreadsheet.getRange('A5').setValue(JSON.parse(response)["data"][0]);
+// alert(response.getContentText())
+// if(!secondSamsara)  getLocations(false,true)
+  createCommentForDrivers();
+}
+function getCity(text){
+    
+// writebrut(text)
+
+  var fromAtoB = text.substring(0, text.lastIndexOf('" itemprop="name"'));
+  var fromAtoB = fromAtoB.split('<meta content="');
+  fromAtoB = fromAtoB[fromAtoB.length-1];
+  fromAtoB = fromAtoB.split(' to ')[0]
+
+  var detailed = text.split(fromAtoB)[4]
+  detailed = detailed.split('"')[0]
+  detailed = detailed.split('\\')[0]
+  detailed = detailed.split(', USA')[0]
+  return fromAtoB+detailed
+}
+function getMiles(url = "https://www.google.com/maps/dir/39.00013286,-95.40692536/&Denver,%20CO&/@39.00013286,-95.40692536") {
+  
+  var response = UrlFetchApp.fetch(url).getContentText();
+
+
+  var cityName = getCity(response)
+  // Logger.log()
+  // return
+  // writebrut(fromAtoB)
+  // return
+
+  var st = response.split("miles")[0]
+  var ct = st.substring(st.length-10).split('"')[1]
+  var miles = ct.replace("undefined,", "0");
+  // Logger.log(ct.replace("undefined,", "0") + " mi | "+etaOfTruck(parseFloat(ct.replace(/\D/g,''))));
+  cityName = "Current location: "+cityName+"\n"+miles+" miles left"
+  miles = miles+ " mi | "+etaOfTruck(parseFloat(ct.replace(',', '').replace(/\s/g, '')))
+  
+  return [ miles,cityName];
+}
+
+function etaOfTruck(miles = 200){
+    // more than 15
+    var speed = 50
+    var timeInMs = (1000*60*60)*miles/speed
+    var now = new Date().getTime();
+    var eta = now+timeInMs
+    eta = new Date(eta)
+    var dt = eta.getDate();
+    var hrs = eta.getHours(); 
+    var dttoday = new Date().getDate() ;
+    // Logger.log(miles+" miles"+dt +" "+ dttoday)
+    if( (dt == dttoday) ||  (dt != dttoday && miles < 500)){ //  07:00 - 06:00 &&&  && miles <=850
+      // Logger.log(miles+" miles"+dt +" "+ new Date().getDate()+"   "+hrs+" >>"+addZeroBefore(hrs)+":"+addZeroBefore(eta.getMinutes()))
+      return addZeroBefore(hrs)+":"+addZeroBefore(eta.getMinutes())
+    } 
+  // Logger.log(addZeroBefore(dt)+"/"+addZeroBefore(eta.getMonth()+1))
+  return addZeroBefore(eta.getMonth()+1)+"/"+addZeroBefore(dt) 
+
+}
+
+function addZeroBefore(n) {
+  return (n < 10 ? '0' : '') + n;
+}
+
+function valid(){
+  if(Session.getActiveUser().getEmail() == 'dispatch@martianexpress.us'){
+    return true;
+  }else{
+    alert("You can not use this function")
+    return false;
+  }
+}
+function Gross(){ 
+  // if(valid()!=true) return
+  var spreadSheet = SpreadsheetApp.openByUrl(SHEET_URL).getSheetByName("Covered");
+  getGross(spreadSheet); // calls setGross
+}
+
+function setGross(bigArray,currentDay){
+  try{
+  // alert(JSON.stringify(bigArray))
+ 
+          var daysRow=1;
+          var startDayColumn = 3;
+          var endDayColumn = 'I';
+          var DriverColumn = 'A';
+          var FirstDriverRow = 3
+          var stepPropertiesOfLoad = 5
+          var spreadSheet = SpreadsheetApp.openByUrl(SHEET_URL).getSheetByName("Gross");
+          var lastRow = spreadSheet.getLastRow();
+          var lastColumn = spreadSheet.getLastColumn();
+        
+
+          for(j=startDayColumn;j<lastColumn;j++){
+    
+            var colVal = spreadSheet.getRange(daysRow,j).getValue()
+          
+            if (!(isDate(colVal))) continue;
+            var colValTimeDay = colVal.getTime()
+            var dayofweek = colVal.getDay()
+            if(!(colValTimeDay in bigArray)) continue;
+          
+            for(var i =FirstDriverRow; i<=lastRow;i+=1){ //stepPropertiesOfLoad
+              var tmpDriver=spreadSheet.getRange(DriverColumn+i).getValue()
+            
+          
+              
+              if(tmpDriver=="" ){
+                continue;
+              }
+              
+              try{
+              tmpDriver =  tmpDriver.match(/\d+/)[0]
+              if(tmpDriver.length == 0){
+                continue;
+              }
+              }
+                catch(er){
+                    continue;
+                }
+                //  clearing gross data of week before setting any value
+                // if(dayofweek == 1 && (!isNaN(parseFloat(tmpDriver)) && isFinite(tmpDriver))){
+                //   // alert(tmpDriver)
+                //   // spreadSheet.getRange(i,j,5,7).clearContent()
+                // }
+               
+              if(tmpDriver in bigArray[colValTimeDay]){
+                // first we set considering one covered per day
+
+                for(k=0;k<bigArray[colValTimeDay][tmpDriver].length;k++){
+                  if(k==0){
+                    
+                    spreadSheet.getRange(i,j).setValue(bigArray[colValTimeDay][tmpDriver][k]["LOAD#"]);        
+                    spreadSheet.getRange(i+1,j).setValue(bigArray[colValTimeDay][tmpDriver][k]["PU"]);
+                    spreadSheet.getRange(i+2,j).setValue(bigArray[colValTimeDay][tmpDriver][k]["DEL"]);
+                    spreadSheet.getRange(i+3,j).setValue(bigArray[colValTimeDay][tmpDriver][k]["RATE"]);
+                    spreadSheet.getRange(i+4,j).setValue(bigArray[colValTimeDay][tmpDriver][k]["MILES"]);
+                  }else{
+                    var oldLoad = spreadSheet.getRange(i,j).getValue();
+                      spreadSheet.getRange(i,j).setValue(oldLoad+"|"+bigArray[colValTimeDay][tmpDriver][k]["LOAD#"]); 
+                    var oldpu = spreadSheet.getRange(i+1,j).getValue();
+                      spreadSheet.getRange(i+1,j).setValue(oldpu+"|"+bigArray[colValTimeDay][tmpDriver][k]["PU"]);
+                    var olddel = spreadSheet.getRange(i+2,j).getValue();
+                      spreadSheet.getRange(i+2,j).setValue(olddel+"|"+bigArray[colValTimeDay][tmpDriver][k]["DEL"]);
+                    var oldRate = spreadSheet.getRange(i+3,j).getValue() ;
+                    var newRate =parseInt(oldRate)+parseInt(bigArray[colValTimeDay][tmpDriver][k]["RATE"]);
+                      spreadSheet.getRange(i+3,j).setValue(newRate);
+                    var oldMile = spreadSheet.getRange(i+4,j).getValue() ;
+                    var newRate =parseInt(oldMile)+parseInt(bigArray[colValTimeDay][tmpDriver][k]["MILES"]);
+                      spreadSheet.getRange(i+4,j).setValue(newRate);            
+                  }
+                }
+              }
+            }
+            
+          } 
+  }catch(e){
+    alert("Error setting  Gross " + e)
+  }        
+}
+ 
+  
+function getGross(spreadSheet){ 
+  try{
+        
+          
+          var nameOfSheet = spreadSheet.getName();
+          var startFrom = 'A1';
+          var lastRow = spreadSheet.getLastRow();
+          var bigArray={};
+          var currentDay = 0
+          
+          for(var i =1; i<=lastRow;i++){ 
+            try{
+                    var AcellValueDay = spreadSheet.getRange('A'+i).getValue();
+                    var rngVal = spreadSheet.getRange(columnsLetters["COVERED"]+i).getValue().toUpperCase();
+
+
+                    if(isDate(AcellValueDay)){
+                                                currentDay = AcellValueDay.getTime()  
+                                                bigArray[currentDay]={};
+                    }else if ( rngVal.includes('COVERED') ){
+                      var driver = spreadSheet.getRange(columnsLetters["TRUCK"]+i).getValue();    
+                      currentDay =  spreadSheet.getRange(columnsLetters["PHONE"]+i).getValue()     
+                            if(isDate(currentDay) ){
+                                                currentDay = currentDay.getTime()  
+                                                if(!(currentDay in bigArray)){bigArray[currentDay]={};}
+                                                
+                            }else{spreadSheet.getRange("A"+i+":L"+i).setBackground("red") ; continue; }     
+                      if(!(driver in bigArray[currentDay])){
+                        bigArray[currentDay][driver]=new Array();
+                      }
+                      var coveredInstance = {
+                        "LOAD#":spreadSheet.getRange(columnsLetters["LOAD#"]+i).getValue(),
+                        "PU":spreadSheet.getRange(columnsLetters["PU"]+i).getValue(),
+                        "RATE":spreadSheet.getRange(columnsLetters["RATE"]+i).getValue(),
+                        "MILES":spreadSheet.getRange(columnsLetters["MILES"]+i).getValue(),
+                        "DEL":spreadSheet.getRange(columnsLetters["DEL"]+i).getValue()
+                      }
+                  
+                      bigArray[currentDay][driver].push(coveredInstance)
+                    
+                    }else if (rngVal.includes('CANCELLED') || rngVal.includes('OFF') || rngVal.includes('OOS') || rngVal.includes('HOME') ){
+                      var driver = spreadSheet.getRange(columnsLetters["TRUCK"]+i).getValue();
+                      if(!(driver in bigArray[currentDay])){
+                        bigArray[currentDay][driver]=new Array();
+                      }
+                      var rt = spreadSheet.getRange(columnsLetters["RATE"]+i).getValue();
+                      var coveredInstance = {
+                        "LOAD#":rngVal+" "+spreadSheet.getRange(columnsLetters["LOAD#"]+i).getValue(),
+                        "PU":spreadSheet.getRange(columnsLetters["PU"]+i).getValue(),
+                        "DEL":spreadSheet.getRange(columnsLetters["DEL"]+i).getValue(),
+                        "MILES":0,
+                        "RATE": 0 //isNaN(rt)? "": rt
+                      }
+                      bigArray[currentDay][driver].push(coveredInstance)
+                    }
+            }catch(e){continue;}  
+          }
+          // alert(currentDay+driver);
+        //  alert(301+JSON.stringify(bigArray[currentDay][driver]));
+        //  alert(JSON.stringify(bigArray))
+          setGross(bigArray,currentDay)
+  }catch(e){
+    alert("Error getting  Gross ")
+  } 
+}
+
+
+function newDay() {
+    try {
+        var activeSpreadsheet = SpreadsheetApp.openByUrl(SHEET_URL);
+        var spreadSheet = activeSpreadsheet.getSheetByName("Loadboard");
+        var lastRow = spreadSheet.getLastRow();
+
+        var notes = false;
+        if (lastRow > 1) {
+            notes = getNotes(spreadSheet, lastRow)
+        }
+
+        
+        newYesterday(spreadSheet, activeSpreadsheet);
+     
+        var lastRowOfToday = spreadSheet.getLastRow();
+        spreadSheet.deleteRows(3, lastRowOfToday - 3);
+        // 
+        var lstr = spreadSheet.getLastRow()
+        spreadSheet.getRange("A" + lstr + ":"+columnsLetters["LAST_COLUMNLetter"] + lstr).clearContent().setBackground("white");
+ 
+        spreadSheet.getRange(2, 1).setValue(dayDayMonth()).setFontWeight("bold");
+        
+
+        bigArrayDrivers = getDrivers();
+        // alert(bigArrayDrivers)
+        // return
+        setDrivers(bigArrayDrivers[0], 3, spreadSheet, bigArrayDrivers[1])
+      
+        getLocations(notes);
+        addNewDayToCovered();
+        createCommentForDrivers();
+        // Gross()
+    } catch (e) {
+        alert("Error with creating  new Day " + e)
+    }
+}
+function addNewDayToCovered(){
+  var spreadSheet = SpreadsheetApp.openByUrl(SHEET_URL).getSheetByName("Covered");
+  var lastRow = spreadSheet.getLastRow();
+  var lastColumn = spreadSheet.getLastColumn();
+  spreadSheet.getRange(lastRow+1,1,1,lastColumn).mergeAcross().setValue(dayDayMonth()).setFontWeight("bold");
+  spreadSheet.getRange(lastRow+2,1,1,lastColumn).setValues(spreadSheet.getRange(1,1,1,lastColumn).getValues()).setFontWeight("bold").setBackground("#999999");;  
+}
+function dayDayMonth(daysago=0){
+  if(daysago){
+    var date = new Date();
+    var now = new Date(date.getTime() - (daysago * 24 * 60 * 60 * 1000));
+  } else{
+    var now = new Date();
+  }
+  
+  var day = days[ now.getDay() ];
+  var dayM = now.getDate();
+  var month = months[ now.getMonth() ];
+  return day+" "+dayM+"-"+month
+}
+
+function isDate(date){ //isDate
+  if (date instanceof Date && !isNaN(date.valueOf())){
+    return true;
+  }
+  return false;
+}
+
+
+function getDrivers(){
+  try{
+          var spreadSheet = SpreadsheetApp.openByUrl(SHEET_URL).getSheetByName("Driver List");
+          var lastColumn = spreadSheet.getLastColumn();
+          
+          var driverColumnsNumber = {
+            "DRIVER":'B', 
+            "TRUCK":'B',
+            "NUMBER":'G',
+            "DISPATCH":'H'
+          }
+            
+          for(var i=1;i<lastColumn;i++){
+            var AcellValueDay = spreadSheet.getRange(1,i).getValue();
+        
+            if(AcellValueDay == 'Truck'){
+              driverColumnsNumber["DRIVER"]=i
+            }else if(AcellValueDay == 'Driver Name'){
+              driverColumnsNumber["TRUCK"]=i
+            }else if(AcellValueDay == 'Number'){
+              driverColumnsNumber["NUMBER"]=i
+            }else if(AcellValueDay == 'Dispatch'){
+              driverColumnsNumber["DISPATCH"]=i
+            }
+          }
+
+          
+          var mergedlist=[] ;
+          
+          var currentDay = 0
+          var dispatchers=[]
+          for(var i =1;;i++){
+            var AcellValueDay = spreadSheet.getRange('A'+i).getValue();
+            
+            if(AcellValueDay=="INACTIVE"){
+              break;
+            }
+            else if(AcellValueDay=='#'){
+              mergedlist.push(i+2)
+              continue;
+
+            }else{
+              var dispatch = spreadSheet.getRange(i,driverColumnsNumber["DISPATCH"]).getValue();
+              
+              for(j=i;spreadSheet.getRange('A'+i).getValue()=="INACTIVE";j++){
+                var nextdispatch = spreadSheet.getRange(j,driverColumnsNumber["DISPATCH"]).getValue();
+                if(dispatch!=nextdispatch){
+                  mergedlist.push(j+2)
+                  break;
+                }
+              }
+              
+              if(!(dispatch in dispatchers)){
+                dispatchers.push(dispatch)
+              }   
+              i=j;
+           
+            }
+            
+          }
+
+                bigArrayDrivers={
+                  "DRIVER_NUMBER": spreadSheet.getRange(1,driverColumnsNumber["DRIVER"]+1,i-1,2).getValues(), 
+                  "TRUCK": spreadSheet.getRange(1,driverColumnsNumber["TRUCK"]-1,i-1,1).getValues(),
+                  "DISPATCH": spreadSheet.getRange(1,driverColumnsNumber["DISPATCH"],i-1,1).getValues()
+                };
+          Logger.log(mergedlist)
+          Logger.log(bigArrayDrivers)
+          return [bigArrayDrivers,mergedlist];
+  }catch(e){
+    alert("Error getting drivers from driver list" +e)
+  }
+}
+
+function setDrivers(bigArrayDrivers, startfrom,spreadSheet,mergedlist){
+ try{
+          var lastColumn = spreadSheet.getLastColumn(); 
+          
+          rowNumDriver = bigArrayDrivers["DRIVER_NUMBER"].length
+          tmp = startfrom + rowNumDriver -1
+          spreadSheet.getRange(columnsLetters["DRIVER"]+startfrom+':'+columnsLetters["PHONE"]+tmp ).setValues(bigArrayDrivers["DRIVER_NUMBER"]);
+          spreadSheet.getRange(columnsLetters["TRUCK"]+startfrom+':'+columnsLetters["TRUCK"]+tmp ).setNumberFormat('@STRING@').setValues(bigArrayDrivers["TRUCK"]);
+          spreadSheet.getRange(columnsLetters["DISPATCH"]+startfrom+':'+columnsLetters["DISPATCH"]+tmp ).setValues(bigArrayDrivers["DISPATCH"]);
+          spreadSheet.getRange("A"+startfrom+':'+columnsLetters["LAST_COLUMNLetter"]+tmp ).setFontWeight("normal")
+          
+          var lastRow = spreadSheet.getLastRow();
+          // for(i=startfrom-1,k=0;i<lastRow;i++,k++){
+          for(i=0;i<mergedlist.length-1;i++){ 
+              spreadSheet.getRange(mergedlist[i],1,1,lastColumn).mergeAcross().setValue(bigArrayDrivers["DISPATCH"][mergedlist[i]-1]).setFontWeight("bold").setBackground("#b7b7b7"); //#999999 d9ead3 #b7b7b7
+          }
+          var lastRow = spreadSheet.getLastRow();
+          spreadSheet.getRange(lastRow,1,1,lastColumn).setValues(spreadSheet.getRange(1,1,1,lastColumn).getValues()).setFontWeight("bold").setBackground("#b7b7b7");  
+
+          var sheet10B2 = SpreadsheetApp.openByUrl(SHEET_URL).getSheetByName("Sheet10").getRange("B2");
+          Logger.log(JSON.stringify(mergedlist));
+          sheet10B2.setValue(JSON.stringify(mergedlist));
+  }catch(e){
+    Logger.log("Error inputing drivers into Loadboard")
+    alert("Error inputing drivers into Loadboard")
+  }
+}
+
+
+function getNotes(spreadSheet,lastRow){ 
+   try{ 
+          var flagH = true;
+          var notes={}
+
+        
+          for(var i = lastRow-1; i>1 && !isDate(spreadSheet.getRange("A"+i).getValue());i--){
+            
+            var rnge = spreadSheet.getRange(columnsLetters["COVERED"]+i)
+            var rngeVal = rnge.getValue().toUpperCase();
+            if(rnge.isPartOfMerge() ){ continue}            
+            if(!(rngeVal.includes('COVERED') || rngeVal.includes('CANCELLED'))){
+            notes[spreadSheet.getRange(columnsLetters["TRUCK"]+i).getValue()] = spreadSheet.getRange(columnsLetters["RATE"]+i+":"+columnsLetters["BROKER"]+i).getValues()
+            }
+            
+          }
+          
+           
+          return notes
+  } catch(e){
+    alert("Error hiding rows" + e)
+  }
+}
+function removeDispatchName(spreadSheet,lastRow){
+  
+        var upperVal = 0;
+          for(var i = lastRow-1; i>1 && !isDate(spreadSheet.getRange("A"+i).getValue());i--){
+            
+            var rnge = spreadSheet.getRange(columnsLetters["COVERED"]+i)
+            var rngeVal = rnge.getValue().toUpperCase();
+            if(rnge.isPartOfMerge() ){ //|| rngeVal.includes('STATUS') 
+              spreadSheet.deleteRow(i);
+              continue;
+            } else  if( rngeVal.includes('STATUS') ){ //rngeVal.includes('COVERED') || rngeVal.includes('CANCELLED') ||
+              break;
+            }   
+            
+          }
+  try{
+    return i+1
+  }catch(e){
+    alert("Error with night removeDispatchName upperVal " + e)
+  }
+  
+}
+function customSort2(spreadSheet=SpreadsheetApp.openByUrl(SHEET_URL).getSheetByName("Loadboard"),upperVal=47,bottomVal=60){ 
+  try{ 
+  var conditions = {"COVERED":"AA","CANCELLED":"BB","HOLD":"CC","READY":"DD","DHING":"EE","UNLOADING":"FF","ETA":"HF","TOUR":"HFF","PU":"II","PU_CHECKED_IN":"JJ","OFF":"KK","OOS":"LL","HOME":"MM","ELD":"NN","":"OO"};
+                      
+                      
+  var stsrange = spreadSheet.getRange(columnsLetters["COVERED"]+upperVal+":"+columnsLetters["COVERED"]+bottomVal);
+  var sortingColumn = spreadSheet.getRange(columnsLetters["LAST_COLUMNLetter"]+upperVal+":"+columnsLetters["LAST_COLUMNLetter"]+bottomVal);
+  var statusValues = stsrange.getValues();
+  // var brokerValues = sortingColumn.getValues();
+  var newstsVal = [];
+  var stlen = statusValues.length;
+  var newOrderedVals = []
+
+ 
+  for(var j =0;j<stlen;j++){
+
+      try{
+          var el = statusValues[j][0];
+          var bool_date = el.includes("/");
+          el = el.split(" ")[0].toUpperCase(); //needs to be in conditions object
+      
+          if((el.includes("ETA") && bool_date) || (el.includes("TOUR") && bool_date))
+          {
+            newstsVal[j] = ["HH"+" "+statusValues[j][0]];
+          }else if(conditions[el]){
+            newstsVal[j] = [conditions[el]+" "+statusValues[j][0]];
+          }else{
+            newstsVal[j] = ["WW"+statusValues[j][0]];
+          }
+      }catch(e){
+          newstsVal[j] = ["WW"+statusValues[j][0]];
+      }
+      
+  }
+  // write(JSON.stringify(newstsVal))
+  sortingColumn.setValues(newstsVal)  
+  spreadSheet.getRange("A"+upperVal+":"+columnsLetters["LAST_COLUMNLetter"]+bottomVal).sort(columnsLetters["LAST_COLUMN"])  
+  // newstsVal = newstsVal.sort();
+  // for(i=0;i<stlen;i++){newstsVal[i][0]=newstsVal[i][0].slice(3,);}
+  // sortingColumn.clearContent()
+  }catch(e){write("custom sort 2: "+e)}
+}
+
+
+var upper_lower_bounds=[]
+ 
+
+function get_bounds(){
+  if(upper_lower_bounds.length==0){
+    var sheet10B2 = SpreadsheetApp.openByUrl(SHEET_URL).getSheetByName("Sheet10").getRange("B2").getValue();
+    return JSON.parse(sheet10B2)
+  }else{
+    return upper_lower_bounds
+  }
+}
+
+function commentOfpuToVal(sourceSheet,rowNumber){
+    var delR = sourceSheet.getRange(columnsLetters["DEL"]+rowNumber)
+    var delC = delR.getComment()
+
+    delR.setValue(delC).setComment("")
+}
+
+function moveCovered(sourceSheet,rowNumber,cellValue){
+  try{  
+      //get date correctly and move to right date  getProperDate()
+    var target_sheet = SpreadsheetApp.openByUrl(SHEET_URL).getSheetByName("Covered");
+    var source_range = sourceSheet.getRange("A"+rowNumber+":L"+rowNumber);
+    var lastRow = target_sheet.getLastRow()+1;
+    var target_range = target_sheet.getRange("A"+lastRow+":L"+lastRow);
+    var source_values = source_range.getValues();
+    write(JSON.stringify(source_values))
+    source_values[0][5]=dayDayMonth()
+    write(JSON.stringify(source_values))
+    target_range.setValues(source_values)
+    // source_range.copyTo(target_range);
+    if(cellValue.toUpperCase().includes("COVERED")){
+      
+      target_range.setBackground("#ffe599");
+    
+    sourceSheet.getRange(columnsLetters["LOAD#"]+rowNumber).setBackground("white")
+    sourceSheet.getRange(columnsLetters["MILES"]+rowNumber).setValue("").setBackground("white")
+    sourceSheet.getRange(columnsLetters["RATE"]+rowNumber).setValue("").setBackground("white")
+    sourceSheet.getRange(columnsLetters["BROKER"]+rowNumber).setValue("").setBackground("white")
+    sourceSheet.getRange(columnsLetters["COVERED"]+rowNumber).setValue("pu")
+    var delR = sourceSheet.getRange(columnsLetters["DEL"]+rowNumber)
+    var puR = sourceSheet.getRange(columnsLetters["PU"]+rowNumber)
+    var delV = delR.getValue()
+    var puV = puR.getValue()    
+    delR.setValue(puV).setBackground("white").setComment(delV)
+    // oneditCoveredToGross(lastRow,target_sheet);
+    }else{
+      // target_range.setBackground("red");
+      target_sheet.hideRow(target_range);
+    }
+
+    target_sheet.getRange(columnsLetters["PHONE"]+lastRow).setValue(dayDayMonth());
+    
+  }catch(e){
+    write("error in moveCovered " +e )
+  }
+}
+
+function coveredValidate(sourceSheet,currentRow){
+  var allgood = true;
+  var wrong = ""
+  loadnumRange = sourceSheet.getRange(columnsLetters["LOAD#"]+currentRow) 
+
+  if(loadnumRange.getValue() == ""){
+    allgood = false;
+    wrong+="load #"
+    alert("Load # is filled incorrectly")
+    loadnumRange.setBackground("red")
+  }
+
+  
+  mileRange = sourceSheet.getRange(columnsLetters["MILES"]+currentRow)
+  mileVal = mileRange.getValue() 
+   
+  if( !(!isNaN(parseFloat(mileVal)) && isFinite(mileVal)) ){ //|| isNaN(parseFloat(mileVal))
+    allgood = false;
+    alert("Mileage is filled incorrectly")
+    mileRange.setBackground("red")
+  }
+  
+  rateRange = sourceSheet.getRange(columnsLetters["RATE"]+currentRow)
+  rateVal = rateRange.getValue() 
+   
+    
+  if(!(!isNaN(parseFloat(rateVal)) && isFinite(rateVal))){  
+     alert("Rate is filled incorrectly")
+    allgood = false;
+    rateRange.setBackground("red")
+  }
+  brokerRange = sourceSheet.getRange(columnsLetters["BROKER"]+currentRow)
+  brokerVal = brokerRange.getValue() 
+  if(brokerVal  == "" ){
+    allgood = false;
+    alert("Broker is filled incorrectly")
+    brokerRange.setBackground("red")
+  }
+  if(!allgood){
+    sourceSheet.getRange(columnsLetters["COVERED"]+currentRow).setValue("Wrong")
+  }
+ 
+  return allgood
+}
+
+function tempSolution(){
+
+}
+function alert2(){
+  var ui = SpreadsheetApp.getUi();
+var response = ui.prompt('May I know your name?', ui.ButtonSet.YES_NO);
+
+// Process the user's response.
+if (response.getSelectedButton() == ui.Button.YES) {
+  Logger.log('The user\'s name is %s.', response.getResponseText());
+} else if (response.getSelectedButton() == ui.Button.NO) {
+  Logger.log('The user didn\'t want to provide a name.');
+} else {
+  Logger.log('The user clicked the close button in the dialog\'s title bar.');
+}
+
+
+}
+function modal(){
+
+  var htmlOutput = HtmlService
+    .createHtmlOutput('<input type="date"   value="yyyy-mm-dd" class="input-medium search-query" onkeypress="return false" autofocus="autofocus">') //('<label for="start">Start date:</label><input type="date" id="start" name="trip-start" value="2018-07-22" min="2018-01-01" max="2018-12-31">')
+    // .setWidth(250)
+    // .setHeight(300);
+SpreadsheetApp.getUi().showModelessDialog(htmlOutput, 'My add-on');
+}
+function alertSpec(){
+ 
+var ui = SpreadsheetApp.getUi();
+var response = ui.alert('Confirm', 'When is the pick up? ', ui.ButtonSet.YES_NO_CANCEL);
+
+// Process the user's response.
+if (response == ui.Button.YES) {
+  alert('The user clicked "Yes."');
+} else if (response == ui.Button.NO){
+  alert('The user clicked "No" or the close button in the dialog\'s title bar.');
+} else if (response == ui.Button.CANCEL){
+  alert('CANCEL');
+}
+}
+function oneditCoveredToGross(currentRow,sourceSheet = SpreadsheetApp.openByUrl(SHEET_URL).getSheetByName("Covered")){
+// modal()
+// alert2()
+//  alertSpec()
+  if((sourceSheet.getRange(columnsLetters["PHONE"]+currentRow).getValue()).length<5 || !coveredValidate(sourceSheet,currentRow)) return;
+  sourceSheet.getRange("A"+currentRow+":"+"L"+currentRow).setBackground("#ffe599")
+
+
+  var bigArray={};
+  currentDay = (sourceSheet.getRange(columnsLetters["PHONE"]+currentRow).getValue()).getTime() 
+  bigArray[currentDay]={};
+  var driver = sourceSheet.getRange(columnsLetters["TRUCK"]+currentRow).getValue(); 
+  bigArray[currentDay][driver]=new Array();
+
+  coveredInstance = {
+    "LOAD#": sourceSheet.getRange(columnsLetters["LOAD#"]+currentRow).getValue(),
+    "PU":sourceSheet.getRange(columnsLetters["PU"]+currentRow).getValue(),
+    "DEL":sourceSheet.getRange(columnsLetters["DEL"]+currentRow).getValue(),
+    "RATE":sourceSheet.getRange(columnsLetters["RATE"]+currentRow).getValue(),
+    "MILES":sourceSheet.getRange(columnsLetters["MILES"]+currentRow).getValue(),
+    "pudate":sourceSheet.getRange(columnsLetters["PHONE"]+currentRow).getValue()
+  }
+  bigArray[currentDay][driver].push(coveredInstance)
+  // setGross(bigArray,currentDay)
+  // alert(JSON.stringify(bigArray))
+}
+
+
+
+function validateHoursMinutes(totalDuration){
+  return /^\d{2}:\d{2}$/.test(totalDuration);
+} 
+
+function checkTruckColumn(truckColumn,needle){
+  for(i=0;i<truckColumn.length;i++){
+    if(parseInt(truckColumn[i][0])==needle){
+      return i +2
+    }
+  }
+  
+  return -1
+}
+
+function checktimer(text="timer 02:54 hello",truckNumber="fake"){ //truck,driver,cellValue
+  var signOfTimer=""
+  
+  if(text.length==0) return false;
+  if(text.includes("##") ){signOfTimer = "##"; sendMessage("##",truckNumber)}
+  if(text.includes("TIMER") ){signOfTimer = "TIMER"; }
+  if(signOfTimer="") return false;
+
+  var textValueArray = text.split(" ").filter(function (el) {return el != ""});
+  if(textValueArray.length<3) return false; 
+
+  var time = textValueArray[1].trim();
+  var note=text.split(time)[1]
+  var fintime = time
+  if(!validateHoursMinutes(time)) return false;
+
+  
+  var time = time.split(":");
+  var timerHour = parseInt(time[0])
+  var timerMinute = parseInt(time[1])
+
+  var currentDate = new Date()
+  var minutes = currentDate.getMinutes();
+  var hour = currentDate.getHours();
+  var dif = timerMinute- minutes
+  if(hour == timerHour && (dif<=5 && dif>=-5)){
+    // sendMessage((hour == timerHour && (dif<=5 && dif>=-5))+"   "+(dif<=5 && dif>=-5)+" "+note+" "+truckNumber,truckNumber)
+    sendMessage(note,truckNumber)
+    text = fintime+" "+note
+    return text
+
+  }
+  return false
+}
+
+function myOnEdit(event){
+  /// IT SHOULD ONLY WORK WITHIN TODAY UPPER LIMIT SHOULD BE BOUND TO TODAY
+  if (!event) return ; 
+  
+  var sourceSheet = event.source.getActiveSheet();
+  var range = event.range;
+  var currentRow = range.getRow();
+
+  // if(sourceSheet.getSheetName()=="Covered") {oneditCoveredToGross(currentRow,sourceSheet); }
+  if(sourceSheet.getSheetName()!="Loadboard") return;
+
+  var cellValue = range.getValue();
+
+
+
+
+//////////////////
+  var triggeredColumn = range.getColumn();
+  if(triggeredColumn!=columnsLetters["COVEREDnUMBER"]) return;
+
+  
+  
+  
+  if(currentRow>=sourceSheet.getLastRow() || cellValue.includes("STATUS") || range.isPartOfMerge()) return;
+
+  if((cellValue.toUpperCase().includes("COVERED") && coveredValidate(sourceSheet,currentRow)) || cellValue.toUpperCase().includes("OFF") || cellValue.toUpperCase().includes("OOS") || cellValue.toUpperCase().includes("ELD") || cellValue.toUpperCase().includes("HOME")){moveCovered(sourceSheet,currentRow,cellValue); }
+  //
+    if(cellValue.toUpperCase().includes("PU_CHECKED_IN")){commentOfpuToVal(sourceSheet,currentRow); }
+  boundList = get_bounds();
+  lngth = boundList.length;
+  for(i=0;i<lngth;i++){
+    if(currentRow>boundList[i] && currentRow<boundList[i+1])
+      break;
+  }
+ 
+ 
+
+  customSort2(sourceSheet,boundList[i]+1,boundList[i+1]-1)
+  // alert(upperBound+" "+lowerBound)
+}
+
+function ttt(){alert(JSON.stringify(upper_lower_bounds))}
+function nightShiftBoard(){ return;
+  try{
+          var spreadSheet = SpreadsheetApp.openByUrl(SHEET_URL).getSheetByName("Loadboard");
+          var lastRow = spreadSheet.getLastRow();          
+          var upperVal=removeDispatchName(spreadSheet,lastRow);          
+          lastRow = spreadSheet.getLastRow();
+          var bottomVal = lastRow-1
+          customSort(spreadSheet,upperVal,bottomVal)
+  } catch(e){
+    alert("Error with night loadboard")
+  }
+}
+ 
+// function rm(){alert(SpreadsheetApp.openByUrl(SHEET_URL).getName())}
+function newWeek(){
+  // DUPLICATE AND HIDE
+  var newName = "Covered "+ dayDayMonth(7)+" - "+ dayDayMonth(1)
+  var activeSpreadsheet = SpreadsheetApp.openByUrl(SHEET_URL);
+  var spreadSheet = activeSpreadsheet.getSheetByName("Covered");
+
+  var copy = spreadSheet.copyTo(activeSpreadsheet);
+  copy.setName(newName) //.rename("Hello world");
+  copy.hideSheet();
+
+
+  // REMOVE OLD DATA AND ADD NEW DAY
+  var lastRow = spreadSheet.getLastRow();
+  spreadSheet.insertRowAfter(lastRow);
+  spreadSheet.deleteRows(2,(lastRow-1));
+
+  spreadSheet.getRange(2,1,1,spreadSheet.getLastColumn()).setBackground("white");
+  spreadSheet.insertRowsAfter(2,1000);
+  newDay();
+
+}
+ 
+function newYesterday(today,activeSpreadsheet){
+  // DUPLICATE AND HIDE
+  var newName = "Yesterday"
+  var yest = activeSpreadsheet.getSheetByName(newName);
+  activeSpreadsheet.deleteSheet(yest);
+  var copy = today.copyTo(activeSpreadsheet);
+  copy.setName(newName)  
+  // getGross()
+}
+
+function alert(text){
+  // return;
+ write(text)
+}
+
+function gpstab(){
+          var response = UrlFetchApp.fetch("https://apigps.gpstab.com/api/v1/driver/eld?id=&displayid=", {
+        "headers": {
+          "X-Api-Key": "21c6db9116d2465b8820e848e764694f" //"fbcdfb1e0376464ba363306073ec0b63"
+        }
+        });
+        response = JSON.parse(response);
+
+        var leng = response["Data"].length;
+        var dt = response["Data"];
+        var rspnsfrmt  = {};
+        for(var i = 0;i<leng;i++){
+          try{
+                // speed, location, hours RECAP
+                // alert(JSON.stringify(dt[i]["Vehicle"]))
+                var truckNumber = dt[i]["Vehicle"]["DisplayID"], dt;
+                if((dt[i]["Location"]["TimeStamp"]>"2021-01-01T00:30:03.000Z" && gpstabTrucks.includes(parseInt(truckNumber))) || truckNumber=="NIYAZ_777"){
+                  var lc  = dt[i]["Location"]["TextLocation"].split(' of ');
+                  dt[i]["Location"]["TextLocation"] = lc[1]
+                  var hrs = (!dt[i]["HOS"]["Recap"]) ? (dt[i]["HOS"]["Cycle"]/3600).toFixed()+" ("+(dt[i]["HOS"]["Cycle"]/3600).toFixed()+")": (dt[i]["HOS"]["Cycle"]/3600).toFixed()+" ("+(parseInt((dt[i]["HOS"]["Recap"]/3600).toFixed())+parseInt((dt[i]["HOS"]["Cycle"]/3600).toFixed()))+")";
+                  if ((truckNumber in rspnsfrmt) ){
+                    dtdt = {
+                      // "speed": dt[i]["Location"]["Speed"] +" / " + rspnsfrmt[truckNumber]["speed"],
+                      // "location": dt[i]["Location"]["TextLocation"] +" / " + rspnsfrmt[truckNumber]["location"],
+                      "hours": hrs +" / " + rspnsfrmt[truckNumber]["hours"],
+                      "drivers" : dt[i]["Driver"]["FirstName"]+" "+dt[i]["Driver"]["LastName"]+" ("+dt[i]["Location"]["TimeStamp"]+") "+" / " + rspnsfrmt[truckNumber]["drivers"],
+                      "TimeStamp" : dt[i]["Location"]["TimeStamp"]+" / " + rspnsfrmt[truckNumber]["TimeStamp"],
+                      "Log" : dt[i]["Log"]["CurrentStatus"]+" / " + rspnsfrmt[truckNumber]["Log"],
+                      "comment": dt[i]["Log"]["CurrentStatus"]+ "\nB: "+ (dt[i]["HOS"]["Break"]/3600).toFixed()+ " D: "+ (dt[i]["HOS"]["Driving"]/3600).toFixed()+ " SH: "+ (dt[i]["HOS"]["Shift"]/3600).toFixed() + "\n"+ dt[i]["HOS"]["ErrorsAndViolations"].join() + "\n" + rspnsfrmt[truckNumber]["comment"]
+
+                    } 
+                    if(dt[i]["Location"]["TimeStamp"]>=rspnsfrmt[truckNumber]["TimeStamp"]){
+                      dtdt["speed"] = (dt[i]["Location"]["Speed"]).toFixed();
+                      dtdt["location"] = dt[i]["Location"]["TextLocation"];
+                      dtdt["coordinates"] = dt[i]["Location"]["Latitude"]+","+dt[i]["Location"]["Longitude"]
+                    }else{
+                      dtdt["speed"] = rspnsfrmt[truckNumber]["speed"];
+                      dtdt["location"] = rspnsfrmt[truckNumber]["location"];
+                      dtdt["coordinates"] = rspnsfrmt[truckNumber]["coordinates"];
+                    }
+                  }else{
+                    dtdt = {
+                      "speed": (dt[i]["Location"]["Speed"]).toFixed(),
+                      "location": dt[i]["Location"]["TextLocation"],
+                      "hours": hrs,
+                      "drivers" : dt[i]["Driver"]["FirstName"]+" "+dt[i]["Driver"]["LastName"] +" ("+dt[i]["Location"]["TimeStamp"]+")",
+                      "TimeStamp" : dt[i]["Location"]["TimeStamp"],
+                      "Log" : dt[i]["Log"]["CurrentStatus"],
+                      "comment": dt[i]["Log"]["CurrentStatus"]+ "\nB: "+ (dt[i]["HOS"]["Break"]/3600).toFixed()+ " D: "+ (dt[i]["HOS"]["Driving"]/3600).toFixed()+ " SH: "+ (dt[i]["HOS"]["Shift"]/3600).toFixed() + "\n"+ dt[i]["HOS"]["ErrorsAndViolations"].join(),
+                      "coordinates": dt[i]["Location"]["Latitude"]+","+dt[i]["Location"]["Longitude"]
+
+                    } 
+                    
+                  }
+                  
+                  rspnsfrmt[truckNumber] = dtdt;
+                }
+                
+            // write(dtdt["coordinates"])
+          }catch (e){
+            // alert(JSON.stringify(dt[i]))
+          }
+
+        }
+        // alert(leng)
+        // alert(JSON.stringify(rspnsfrmt))
+        // Logger.log(rspnsfrmt)
+        return rspnsfrmt;
+
+}
+
+
+
+var updategroups = {
+  // '31818': ['-527745335', '31818'],
+  '008': ['-510679246', 'Askar'],
+  '2211': ['-430830245', 'Abbos'], 
+   '997': ['-508508477', 'Alisher Duskulov'],  
+  '101': ['-1001478747729', 'Khusan'], 
+  '1141': ['-527052583', 'Recardo'], // -527052583,"title":"Recardo Jo 1001168426573
+  '1142': ['-486564933', 'Sylverson'], 
+  '4517': ['-470721390',' Wendel Alberis / Frantzy Buno  '], //['-474307237', 'Sunshinely'], '-498584704','Abdifatah Santur / Hassan Sheikh'   
+  // '29062': ['-504182656', 'Lucktong Dorelien (C)'], 
+  '1996': ['-518859322', 'Uchkun'], 
+  '123': ['-542015177', 'Kalmat Urgaliev'], 
+  '7700': ['-407938249', 'Jaloliddin Rakhimov'],  
+  '6680': ['-495100664', 'Fazliddin'], 
+  '545': ['-375801903', 'Aiylchy'],  
+  '136': ['-1001481352826', 'Ilgiz'], 
+  '29062': ['-431221702', 'Claude Raymond / Joseph Richemin'],
+ '21720': ['-542317454', 'Gaston Guevara / Sergio Guevara'], 
+  '29038': ['-597001782', 'Mark'], 
+  '6677': ['-1001165415516', 'Rustam'], 
+  '707': ['-430488730', 'Akmal'], 
+  '6685': ['-399821504', 'Sardor'], 
+  // '7700': ['-577670150', 'Musset Edouard / Ernst Jean'], 
+  '273603': ['-539757255', 'Shukhrat'], 
+  '385527':  ['-523215866', 'Feisal Hassan / Abdifatah Mohamed'],             
+  // '29060':  ['-589111458', 'Nesly Martelus / Claude Blanc'], 
+  '29060':  ['-573522209', 'Mirakbarkhon'],     
+  '013':  ['-531865262', 'Jamshid'],    
+  '555': ['-1001424141271', 'Yokub'], 
+  'xxx': ['-379945395', 'Sanjar Jabborov'], 
+  '6684': ['-457399758', 'Farrukh'], 
+  '1100': ['-487983592', 'Pierre'], 
+  '6688': ['-580675543', 'Ismael']}
+
+/// every 15 minutes
+function check1hourBeforePickUp(){
+      var spreadSheet = SpreadsheetApp.openByUrl(SHEET_URL).getSheetByName("Loadboard");
+      var lastRow = spreadSheet.getLastRow();
+
+
+      for(var i = lastRow-1; !isDate(spreadSheet.getRange("A"+i).getValue());i--){
+          try{
+            var valueofStatus = spreadSheet.getRange(columnsLetters["COVERED"]+i).getValue().toUpperCase()
+            var valueofTruck = spreadSheet.getRange(columnsLetters["TRUCK"]+i).getValue();
+            var loadNumber = spreadSheet.getRange(columnsLetters["LOAD#"]+i).getValue();
+
+            if( updategroups[valueofTruck]){
+              if(valueofStatus.includes('PU') && !valueofStatus.includes('PU_CHECKED_IN')) 
+                {
+                  notify1hourBeforePickUp(valueofStatus,valueofTruck,loadNumber);          
+                }
+
+            }
+          }
+          catch(e){
+            Logger.log(e)
+          }
+
+      }
+}
+
+
+function notify1hourBeforePickUp(puDateText, valueofTruck,loadNumber){
+      var dirtyDate = puDateText.replace('PU ','')
+      if(dirtyDate.length<9){
+        return
+      }
+      /// by default considering time as mm/dd hh:mm
+      try{
+          var cleanDate = new Date(Date.parse(dirtyDate))
+      } catch(e){
+      Logger.log("unable to obtain clean date "+e);
+      return
+    }
+      
+      // for some reason default value was 2001 year, changin that by adding 20
+      cleanDate.setFullYear(cleanDate.getFullYear() +20)
+      var diffMs = (cleanDate- new Date() ); // milliseconds between now & Christmas
+      var diffDays = Math.floor(diffMs / 86400000); // days
+      var diffHrs = Math.floor((diffMs % 86400000) / 3600000); // hours
+      var diffMins = Math.round(((diffMs % 86400000) % 3600000) / 60000); // minutes
+      var msg=""
+      if (diffDays==0 &&  diffHrs==1 && diffMins<10){
+        // you have laod picking up in  hours and minutes
+        msg = "Dear driver, you have load "+loadNumber+" picking up in " +diffHrs+" hours "+diffMins+" minutes."
+      }
+      
+      if (diffDays==0 && diffHrs==0 && diffMins>1){
+        // you have laod picking up in  hours and minutes
+        msg = "Dear driver, you have load "+loadNumber+" picking up in "+diffMins+" minutes."
+      }
+
+      if (msg!=""){
+        sendMessage(msg+"\n\nPlease make sure to be on time at the shipper, and notify us about any delay.",valueofTruck)
+      }
+
+
+      return; 
+
+}
+
+function sendMessage(message = "test",valueofTruck='008'){
+  message = message.toLowerCase()
+  var TELEGRAM_updatebot_TOKEN = '1814752062:AAERqqgnQg3z1rgn7UmmomapyypBRUW-Xr0'
+  var url = "https://api.telegram.org/bot"+TELEGRAM_updatebot_TOKEN+"/sendMessage?text="+message+"&chat_id="+updategroups[valueofTruck][0]+"&disable_notification=True"
+  // xx= -594539429;
+  // var url = "https://api.telegram.org/bot"+TELEGRAM_updatebot_TOKEN+"/sendMessage?text="+message+"&chat_id="+xx+"&disable_notification=True"
+  var response = UrlFetchApp.fetch(encodeURI(url))
+}
+
+
+
+function createCommentForDrivers(){
+      
+      var spreadSheet = SpreadsheetApp.openByUrl(SHEET_URL).getSheetByName("Loadboard");
+      var lastRow = spreadSheet.getLastRow();
+
+
+      for(var i = lastRow-1; !isDate(spreadSheet.getRange("A"+i).getValue());i--){
+          try{
+            var valueofPhone = spreadSheet.getRange(columnsLetters["PHONE"]+i).getValue()
+            var valueofTruck = spreadSheet.getRange(columnsLetters["TRUCK"]+i).getValue();
+            var valueofTrailer = spreadSheet.getRange(columnsLetters["TRAILER"]+i).getValue();
+            var rangeofDriver = spreadSheet.getRange(columnsLetters["DRIVER"]+i);
+            var valueofDriver = rangeofDriver.getValue().split("(")[0];
+
+            if(valueofPhone!=""){
+              var comment = valueofDriver+"\nPh: "+valueofPhone+"\nTruck: "+valueofTruck+"\nTrailer: "+valueofTrailer
+              rangeofDriver.setComment(comment)
+            }
+          }
+          catch(e){
+            Logger.log(e)
+          }
+
+      }
+
+
+ 
+
+}
+
+
+
+
