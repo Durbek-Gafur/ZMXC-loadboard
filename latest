@@ -245,7 +245,6 @@ function gethos(clocks){
 function getLocations(notes=false,secondSamsara = false){
   var spreadSheet = SpreadsheetApp.openByUrl(SHEET_URL).getSheetByName("Loadboard");
   var lastRow = spreadSheet.getLastRow();
-  var token = "Bearer samsara_api_OiBTKH2QyjJ3cseKkOWSTJaTy4SScc"
  
   
 
@@ -1403,7 +1402,6 @@ function notify1hourBeforePickUp(puDateText, valueofTruck,loadNumber){
 
 function sendMessage(message = "test",valueofTruck='008'){
   message = message.toLowerCase()
-  var TELEGRAM_updatebot_TOKEN = '1814752062:AAERqqgnQg3z1rgn7UmmomapyypBRUW-Xr0'
   var url = "https://api.telegram.org/bot"+TELEGRAM_updatebot_TOKEN+"/sendMessage?text="+message+"&chat_id="+updategroups[valueofTruck][0]+"&disable_notification=True"
   // xx= -594539429;
   // var url = "https://api.telegram.org/bot"+TELEGRAM_updatebot_TOKEN+"/sendMessage?text="+message+"&chat_id="+xx+"&disable_notification=True"
